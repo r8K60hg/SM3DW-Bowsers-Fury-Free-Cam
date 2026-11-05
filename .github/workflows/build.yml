@@ -1,0 +1,74 @@
+name: Build BF Freecam
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to publish releases
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Build in devkitA64 Docker image
+        run: bash build.sh
+
+      - name: Check packages
+        run: ls -l dist/BFFreecam-emulator.zip dist/BFFreecam-atmosphere.zip
+
+      - name: Upload emulator package (Ryujinx / Ryubing / Eden / Citron)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BFFreecam-emulator
+          path: dist/emulator
+          if-no-files-found: error
+
+      - name: Upload Atmosphere package (modded Switch)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BFFreecam-atmosphere
+          path: dist/atmosphere
+          if-no-files-found: error
+
+      - name: Publish release
+        if: github.ref_name == github.event.repository.default_branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${GITHUB_RUN_NUMBER}"
+          cat > release-notes.md <<'EOF'
+          Free camera for **Super Mario 3D World + Bowser's Fury** — game **version 1.1.0** only.
+
+          ### Which file?
+          - **BFFreecam-emulator.zip** — Ryujinx / Ryubing / Eden / Citron. Unzip and put the `BFFreecam` folder in the game's mod folder (right-click the game → *Open Mods Directory* / *Open Mod Data Location*).
+          - **BFFreecam-atmosphere.zip** — modded Switch. Unzip to the root of your SD card.
+
+          ### Controls
+          | Action | Button |
+          |---|---|
+          | Toggle freecam | Hold **L**, click **R3** |
+          | Move / look | Left stick / right stick |
+          | Up / down | **R** / **L** |
+          | Fast / slow | **ZR** / **ZL** (hold) |
+          | Speed up / down | D-pad **Up** / **Down** |
+          | Tilt | D-pad **Left** / **Right** |
+          | Reset tilt + speed | **Minus** |
+          | Park camera & play | **L3** |
+          EOF
+          echo "" >> release-notes.md
+          echo "Built from commit ${GITHUB_SHA}." >> release-notes.md
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/BFFreecam-emulator.zip dist/BFFreecam-atmosphere.zip \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" dist/BFFreecam-emulator.zip dist/BFFreecam-atmosphere.zip \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "BF Freecam (build ${GITHUB_RUN_NUMBER})" \
+              --notes-file release-notes.md
+          fi
