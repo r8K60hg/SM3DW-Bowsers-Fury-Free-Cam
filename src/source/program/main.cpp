@@ -73,25 +73,10 @@ namespace {
         }
     };
 
-    template<typename State>
-    struct NpadStateHook : public exl::hook::impl::TrampolineHook<NpadStateHook<State>> {
-        using Base = exl::hook::impl::TrampolineHook<NpadStateHook<State>>;
-
-        static void Callback(State* out, const NpadIdType& id) {
-            Base::Orig(out, id);
-            if (freecam::ShouldBlockGameInput() && out != nullptr)
-                NeutraliseStates(out, 1);
-        }
-
-        static void Install() {
-            Base::InstallAtFuncPtr(static_cast<void (*)(State*, const NpadIdType&)>(&nn::hid::GetNpadState));
-        }
-    };
-
+    /* The game reads every controller style through nn::hid::GetNpadStates (it imports nothing else from hid). */
     template<typename State>
     void InstallNpadHooks() {
         NpadStatesHook<State>::Install();
-        NpadStateHook<State>::Install();
     }
 
     /* ------------------------------------------------------------------ */
@@ -182,46 +167,51 @@ namespace {
         return false;
     }
 
-    bool IsSupportedGameBuild() {
+    const game::GameVersion* DetectGameVersion() {
         u8 id[16] = {};
         if (!FindMainBuildId(id)) {
             FREECAM_LOG("Could not read the game's build ID.");
-            return false;
+            return nullptr;
         }
 
         FREECAM_LOG("Game build ID: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
                     id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7],
                     id[8], id[9], id[10], id[11], id[12], id[13], id[14], id[15]);
 
-        for (size_t i = 0; i < sizeof(id); i++) {
-            if (id[i] != game::BuildId110[i])
-                return false;
+        for (const game::GameVersion& version : game::SupportedVersions) {
+            bool match = true;
+            for (size_t i = 0; i < sizeof(id); i++) {
+                if (id[i] != version.buildId[i]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match)
+                return &version;
         }
-        return true;
+        return nullptr;
     }
 
     /* ------------------------------------------------------------------ */
     /* Installation                                                        */
     /* ------------------------------------------------------------------ */
 
-    void InstallCameraHooks() {
-        namespace off = game::offsets;
+    void InstallCameraHooks(const game::CameraOffsets& off) {
+        LookAtHook<0>::InstallAtOffset(off.RsMakeLookAtCamera);
+        RsPoseUpdaterSwitch::InstallAtOffset(off.RsPoseUpdaterSwitch);
 
-        LookAtHook<0>::InstallAtOffset(off::RsMakeLookAtCamera);
-        RsPoseUpdaterSwitch::InstallAtOffset(off::RsPoseUpdaterSwitch);
-
-        LookAtHook<1>::InstallAtOffset(off::PoserAnim);
-        LookAtHook<2>::InstallAtOffset(off::PoserEntrance);
-        LookAtHook<3>::InstallAtOffset(off::PoserFixedAll);
-        LookAtHook<4>::InstallAtOffset(off::PoserFixedPoint);
-        LookAtHook<5>::InstallAtOffset(off::PoserKinopioBrigade);
-        LookAtHook<6>::InstallAtOffset(off::PoserParallel);
-        LookAtHook<7>::InstallAtOffset(off::PoserParallelOnRail);
-        LookAtHook<8>::InstallAtOffset(off::PoserProgramable);
-        LookAtHook<9>::InstallAtOffset(off::PoserRail);
-        LookAtHook<10>::InstallAtOffset(off::PoserRailTower);
-        LookAtHook<11>::InstallAtOffset(off::PoserTower);
-        LookAtHook<12>::InstallAtOffset(off::PoserZoom);
+        LookAtHook<1>::InstallAtOffset(off.PoserAnim);
+        LookAtHook<2>::InstallAtOffset(off.PoserEntrance);
+        LookAtHook<3>::InstallAtOffset(off.PoserFixedAll);
+        LookAtHook<4>::InstallAtOffset(off.PoserFixedPoint);
+        LookAtHook<5>::InstallAtOffset(off.PoserKinopioBrigade);
+        LookAtHook<6>::InstallAtOffset(off.PoserParallel);
+        LookAtHook<7>::InstallAtOffset(off.PoserParallelOnRail);
+        LookAtHook<8>::InstallAtOffset(off.PoserProgramable);
+        LookAtHook<9>::InstallAtOffset(off.PoserRail);
+        LookAtHook<10>::InstallAtOffset(off.PoserRailTower);
+        LookAtHook<11>::InstallAtOffset(off.PoserTower);
+        LookAtHook<12>::InstallAtOffset(off.PoserZoom);
     }
 
     void InstallInputHooks() {
@@ -238,17 +228,22 @@ extern "C" void exl_main(void* x0, void* x1) {
 
     exl::hook::Initialize();
 
-    if (!freecam::cfg::SkipVersionCheck && !IsSupportedGameBuild()) {
-        FREECAM_LOG("Unsupported game version - freecam disabled. This build supports v1.1.0 only.");
-        return;
+    const game::GameVersion* version = DetectGameVersion();
+    if (version == nullptr) {
+        if (!freecam::cfg::SkipVersionCheck) {
+            FREECAM_LOG("Unsupported game version - freecam disabled.");
+            return;
+        }
+        /* Forced: assume the first (newest) table entry. */
+        version = &game::SupportedVersions[0];
     }
 
     /* Input hooks first: the camera hooks read the pad through their trampolines. */
     InstallInputHooks();
     freecam::SetPadReader(ReadPad);
-    InstallCameraHooks();
+    InstallCameraHooks(version->camera);
 
-    FREECAM_LOG("Loaded. Hold L and click R3 to toggle the free camera.");
+    FREECAM_LOG("Loaded for game v%s. Hold L and click R3 to toggle the free camera.", version->name);
 }
 
 extern "C" NORETURN void exl_exception_entry() {

@@ -4,7 +4,7 @@ A free-flying camera for **Super Mario 3D World + Bowser's Fury** (Switch), for 
 
 Toggle it on, fly anywhere with the sticks, park the camera and keep playing Mario from that angle, roll the horizon for photos, then toggle off to get the normal camera back.
 
-> **Game version: 1.1.0 only.** The 1.2.x updates (the Switch 2 patches) move the game's code around. On any other version the mod detects the mismatch at boot and does nothing, so it can't crash your game; it just won't activate.
+> **Game versions: 1.0.0 and 1.1.0.** The mod checks which one you're running at boot and uses the right addresses. The 1.2.x updates (the Switch 2 patches) aren't supported yet; on those the mod detects the mismatch and does nothing, so it can't crash your game.
 
 ---
 
@@ -36,19 +36,19 @@ You need two files, `subsdk9` and `main.npdm`, from a build (see **Getting the f
 1. Right-click the game → **Open Mods Directory**.
 2. Copy the `BFFreecam` folder in there so you end up with
    `…/mods/contents/010028600ebda000/BFFreecam/exefs/subsdk9` and `main.npdm`.
-3. Launch the game. Make sure the **1.1.0** update is the one selected under *Manage Title Updates*.
+3. Launch the game. Use the base game (**1.0.0**) or the **1.1.0** update, not 1.2.x.
 
 ### Eden / Citron / other Yuzu forks
 1. Right-click the game → **Open Mod Data Location**.
 2. Copy the `BFFreecam` folder in there: `…/load/010028600EBDA000/BFFreecam/exefs/subsdk9` and `main.npdm`.
-3. Check it's enabled under the game's **Properties → Add-Ons**, and that update **1.1.0** is installed.
+3. Check it's enabled under the game's **Properties → Add-Ons**. Base game (**1.0.0**) or update **1.1.0** both work; 1.2.x doesn't.
 
 ### Modded Switch (Atmosphère)
 Copy the `atmosphere` folder from the Atmosphère package to the root of your SD card.
 
 **Conflicts:** only one code mod can use `subsdk9` + `main.npdm` at a time, so disable other ExLaunch-based mods (e.g. the Bowser's Fury co-op or online mods) while using this one. Texture/model (romfs) mods are fine.
 
-**Checking it loaded:** with debug logging on, the emulator log shows `[BFFreecam] Loaded…`, or `[BFFreecam] Unsupported game version…` if you're not on 1.1.0.
+**Checking it loaded:** with debug logging on, the emulator log shows `[BFFreecam] Loaded for game v1.0.0…` (or v1.1.0), or `[BFFreecam] Unsupported game version…` on anything else.
 
 ---
 
@@ -57,7 +57,9 @@ Copy the `atmosphere` folder from the Atmosphère package to the root of your SD
 The mod is C++ and has to be compiled with Nintendo Switch homebrew tools. Pick whichever is easiest:
 
 **Option A: GitHub (no installs).**
-Create a new GitHub repository, upload this whole folder (including the hidden `.github` folder), then open the **Actions** tab. The *Build BF Freecam* workflow runs automatically; open the finished run and download **BFFreecam-emulator** (or **BFFreecam-atmosphere**).
+Create a new GitHub repository, upload this whole folder (including the hidden `.github` folder), then open the **Actions** tab. The *Build BF Freecam* workflow runs automatically. When it finishes, the repo's **Releases** section (right-hand sidebar on the main page) gets a new release with **BFFreecam-emulator.zip** and **BFFreecam-atmosphere.zip** attached. Every new commit to the main branch publishes a fresh release. The same files are also on the finished run's page under *Artifacts*.
+
+If the release step fails with a permissions error, go to **Settings → Actions → General → Workflow permissions**, choose **Read and write permissions**, save, and re-run the workflow.
 
 **Option B: Docker (Windows, macOS, Linux).**
 Install Git and Docker Desktop, then run:
@@ -85,7 +87,7 @@ Everything you'd want to tweak is in [`src/source/program/controls.hpp`](src/sou
 - **Input:** reads the controller directly through `nn::hid` (Pro Controller, handheld, or dual Joy-Con on player 1). While flying it hands the game a neutral controller so Mario stands still.
 - **Timing:** motion uses the system tick, so speed is the same at 30 or 60 fps.
 - **Watchdog:** if the game stops building cameras for half a second (pause menu, loading screen), the freecam switches itself off so you never get stuck with a frozen controller. Toggle it back on afterwards.
-- **Safety:** at boot it reads the game's build ID from the executable and only installs hooks on `891687f016a18f17…` (v1.1.0).
+- **Safety:** at boot it reads the game's build ID from the executable and only installs hooks on a version it knows: `9f7efc2fb9653e5c…` (v1.0.0) or `891687f016a18f17…` (v1.1.0).
 
 Source layout (`src/` is copied over a clean ExLaunch checkout at build time):
 
@@ -94,21 +96,22 @@ src/config.json, config.mk          NPDM + build config for title 010028600EBDA0
 src/source/program/main.cpp         hooks, controller reading, version check
 src/source/program/freecam.cpp      camera state machine and flight model
 src/source/program/controls.hpp     ← your settings
-src/source/program/game.hpp         v1.1.0 offsets + build ID
+src/source/program/game.hpp         per-version offsets + build IDs (1.0.0, 1.1.0)
 src/source/program/hid.hpp          minimal nn::hid declarations
 src/source/program/fmath.hpp        small libm-free math
 ```
 
 ## Known limitations
 
-- **v1.1.0 only.** Supporting 1.2.x means finding the same functions in that executable; the offsets live in `game.hpp`.
+- **1.0.0 and 1.1.0 only.** Supporting 1.2.x means finding the same functions in that executable and adding a row to `game.hpp`.
 - **3D World courses:** the mod covers the 12 classic camera types the Bowser's Fury modding community has mapped. If a particular course or cutscene ignores the freecam, it uses a camera type that isn't hooked yet.
 - **Player 1 only.** Other players' controllers aren't blocked while flying.
 - Field of view isn't adjustable (it lives in the projection, not the look-at camera).
 
 ## Credits & license
 
-- Camera hook offsets for v1.1.0: [fruityloops1/bf-multiplayer](https://github.com/fruityloops1/bf-multiplayer) (GPL-2.0), from its debug camera tool.
+- Camera hook offsets for v1.1.0: [fruityloops1/bf-multiplayer](https://github.com/fruityloops1/bf-multiplayer) (GPL-2.0), from its debug camera tool. The v1.0.0 offsets were mapped from those against a 1.0.0 dump, checked against vtable slots and named neighbouring functions.
+- v1.0.0 build ID: [fruityloops1/3dw-practice](https://github.com/fruityloops1/3dw-practice).
 - Hooking framework: [shadowninja108/exlaunch](https://github.com/shadowninja108/exlaunch) (GPL-2.0).
 - NPDM configuration and pinned toolchain image: [Gudui/BowsersFuryLocalCoop](https://github.com/Gudui/BowsersFuryLocalCoop) (GPL-2.0).
 - Build-ID lookup follows the approach used by Atmosphère's crash reporter and LibHakkun.

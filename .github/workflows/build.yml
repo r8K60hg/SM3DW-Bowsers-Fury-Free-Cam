@@ -41,7 +41,7 @@ jobs:
         run: |
           TAG="build-${GITHUB_RUN_NUMBER}"
           cat > release-notes.md <<'EOF'
-          Free camera for **Super Mario 3D World + Bowser's Fury** — game **version 1.1.0** only.
+          Free camera for **Super Mario 3D World + Bowser's Fury** — game **versions 1.0.0 and 1.1.0**.
 
           ### Which file?
           - **BFFreecam-emulator.zip** — Ryujinx / Ryubing / Eden / Citron. Unzip and put the `BFFreecam` folder in the game's mod folder (right-click the game → *Open Mods Directory* / *Open Mod Data Location*).

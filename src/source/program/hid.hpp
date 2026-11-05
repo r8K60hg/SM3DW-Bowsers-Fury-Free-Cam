@@ -47,13 +47,6 @@ namespace nn::hid {
     struct NpadJoyLeftState  : NpadCommonState {};
     struct NpadJoyRightState : NpadCommonState {};
 
-    /* Latest single state. */
-    void GetNpadState(NpadFullKeyState* out,  const NpadIdType& id);
-    void GetNpadState(NpadHandheldState* out, const NpadIdType& id);
-    void GetNpadState(NpadJoyDualState* out,  const NpadIdType& id);
-    void GetNpadState(NpadJoyLeftState* out,  const NpadIdType& id);
-    void GetNpadState(NpadJoyRightState* out, const NpadIdType& id);
-
     /* Ring-buffer history, newest first. Returns the number of entries written. */
     int GetNpadStates(NpadFullKeyState* out,  int count, const NpadIdType& id);
     int GetNpadStates(NpadHandheldState* out, int count, const NpadIdType& id);
